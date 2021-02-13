@@ -1,166 +1,134 @@
 import {Fragment, useEffect, useRef, useState} from "react";
-
+import io from "socket.io-client";
 
 export default function chat() {
-  const localVideoRef = useRef();
-  const remoteVideoRef = useRef();
-  const inputRef = useRef();
+  const userVideo = useRef();
+  const partnerVideo = useRef();
+  const peerRef = useRef();
+  const socketRef = useRef();
+  const otherUser = useRef();
+  const userStream = useRef();
 
-  const [offer, setOffer] = useState();
-  const [answer, setAnswer] = useState();
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(stream => {
+      userVideo.current.srcObject = stream;
+      userStream.current = stream;
 
-  const [localConnection, setLocalConnection] = useState();
-  const [localSignaling, setLocalSignaling] = useState();
-  const [remoteSignaling, setRemoteSignaling] = useState();
+      socketRef.current = io.connect("http://localhost:8000/");
+      socketRef.current.emit("join room", "test");
 
-  //const [localDescription, setLocalDescription] = useState();
-  //const [remoteDescription, setRemoteDescription] = useState();
+      socketRef.current.on('other user', userID => {
+        callUser(userID);
+        otherUser.current = userID;
+      });
 
-  const constraints = {audio: true, video: true};
+      socketRef.current.on("user joined", userID => {
+        otherUser.current = userID;
+      });
 
-  function setLocalDescription() {
-    localConnection.setLocalDescription(JSON.parse(inputRef.current.value)).then(e => console.log("Local Description setted"));
-  }
+      socketRef.current.on("offer", handleRecieveCall);
 
-  function setRemoteDescription() {
-    const description = JSON.parse(inputRef.current.value);
-    localConnection.setRemoteDescription(description).then(e => console.log("Remote Description setted"));
-    /*if ( description.type === 'offer') {
-      localConnection.createAnswer().then(e => setAnswer(e));
-      localConnection.ondatachannel = e => {
-        const remote = e.channel;
-        remote.onmessage = e => console.log("Remote New Message");
-        remote.onopen = e => console.log("Open");
-        setLocalSignaling(remote);
-      }
-    }*/
-  }
+      socketRef.current.on("answer", handleAnswer);
 
-  function setOfferInput () {
-    setOffer(JSON.parse(inputRef.current.value))
-  }
+      socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
+    });
 
-  function setAnswerInput () {
-    setAnswer(JSON.parse(inputRef.current.value))
-  }
-
-  async function imOffer() {
-    localConnection.onicecandidate = e =>  {
-      console.log(" NEW ice candidnat!! on localconnection reprinting SDP " )
-      console.log(JSON.stringify(localConnection.localDescription))
-    }
-    localConnection.oniceconnectionstatechange = e => console.log(e);
-    localConnection.onconnectionstatechange = e => console.log(`OnConnectionStateChange ${JSON.stringify(e)}`);
-    localConnection.onsignalingstatechange = e => console.log(`OnSignalingStateChange ${JSON.stringify(e)}`);
-
-
-
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const localVideo = localVideoRef.current;
-    localVideo.srcObject = stream;
-
-    localConnection.createOffer().then(o => localConnection.setLocalDescription(o)).then(e => console.log(JSON.stringify(localConnection.localDescription)))
-
-    const sendChannel = localConnection.createDataChannel("sendChannel");
-    sendChannel.onmessage =e =>  console.log("messsage received!!!"  + e.data )
-    sendChannel.onopen = e => {
-      console.log("open!!!!");
-      stream.getTracks().forEach(track => {
-        debugger;
-        localConnection.addTrack(track, stream);
-      })
+    return () => {
+      peerRef.current.close();
+      socketRef.current.emit("close")
     };
 
-    localConnection.ontrack = e => console.log('Track LOCAL ' + JSON.stringify(e));
-    sendChannel.onclose = e => console.log("closed!!!!!!");
+  }, []);
+
+  function callUser(userID) {
+    peerRef.current = createPeer(userID);
+    userStream.current.getTracks().forEach(track => peerRef.current.addTrack(track, userStream.current));
   }
 
-  async function imAnswer() {
+  function createPeer(userID) {
+    const peer = new RTCPeerConnection({
+      iceServers: [
+        {
+          urls: "stun:stun.stunprotocol.org"
+        },
+        {
+          urls: 'turn:numb.viagenie.ca',
+          credential: 'muazkh',
+          username: 'webrtc@live.com'
+        },
+      ]
+    });
 
-    localConnection.onicecandidate = e =>  {
-      console.log(" NEW ice candidnat!! on localconnection reprinting SDP " )
-      console.log(JSON.stringify(localConnection.localDescription) )
-    }
+    peer.onicecandidate = handleICECandidateEvent;
+    peer.ontrack = handleTrackEvent;
+    peer.onnegotiationneeded = () => handleNegotiationNeededEvent(userID);
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    const localVideo = localVideoRef.current;
-    localVideo.srcObject = stream;
-
-    localConnection.ondatachannel= event => {
-
-      const receiveChannel = event.channel;
-      receiveChannel.onmessage =e =>  console.log("messsage received!!!"  + e.data )
-      receiveChannel.onopen = e => console.log("open!!!! " + JSON.stringify(e));
-      receiveChannel.onclose =e => console.log("closed!!!!!!");
-      localConnection.channel = receiveChannel;
-
-    }
-
-    localConnection.setRemoteDescription(offer).then(a=>console.log("done"))
-
-//create answer
-    localConnection.createAnswer().then(a => localConnection.setLocalDescription(a)).then(a=>
-      console.log(JSON.stringify(localConnection.localDescription)))
-
-    localConnection.ontrack = e => console.log('Track REMOTE ' + JSON.stringify(e));
+    return peer;
   }
 
-  function generateOffer() {
-    const signaling = localConnection.createDataChannel("chat" ); // handles JSON.stringify/parse
-    localConnection.createOffer().then(e => setOffer(e));
-    signaling.onopen = e => console.log("Open");
-    signaling.onmessage = e => console.log("New Message");
-    setLocalSignaling(signaling);
+  function handleNegotiationNeededEvent(userID) {
+    peerRef.current.createOffer().then(offer => {
+      return peerRef.current.setLocalDescription(offer);
+    }).then(() => {
+      const payload = {
+        target: userID,
+        caller: socketRef.current.id,
+        sdp: peerRef.current.localDescription
+      };
+      socketRef.current.emit("offer", payload);
+    }).catch(e => console.log(e));
   }
 
-  useEffect(() =>  {
-    const configuration = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
-    const lc = new RTCPeerConnection();
+  function handleRecieveCall(incoming) {
+    peerRef.current = createPeer();
+    const desc = new RTCSessionDescription(incoming.sdp);
+    peerRef.current.setRemoteDescription(desc).then(() => {
+      userStream.current.getTracks().forEach(track => peerRef.current.addTrack(track, userStream.current));
+    }).then(() => {
+      return peerRef.current.createAnswer();
+    }).then(answer => {
+      return peerRef.current.setLocalDescription(answer);
+    }).then(() => {
+      const payload = {
+        target: incoming.caller,
+        caller: socketRef.current.id,
+        sdp: peerRef.current.localDescription
+      }
+      socketRef.current.emit("answer", payload);
+    })
+  }
 
+  function handleAnswer(message) {
+    const desc = new RTCSessionDescription(message.sdp);
+    peerRef.current.setRemoteDescription(desc).catch(e => console.log(e));
+  }
 
-
-    const remoteVideo = remoteVideoRef.current;
-    let localStream;
-
-    async function loadLocalMedia() {
-
+  function handleICECandidateEvent(e) {
+    if (e.candidate) {
+      const payload = {
+        target: otherUser.current,
+        candidate: e.candidate,
+      }
+      socketRef.current.emit("ice-candidate", payload);
     }
+  }
 
+  function handleNewICECandidateMsg(incoming) {
+    const candidate = new RTCIceCandidate(incoming);
 
-    setLocalConnection(lc);
+    peerRef.current.addIceCandidate(candidate)
+      .catch(e => console.log(e));
+  }
 
-    loadLocalMedia();
-// send any ice candidates to the other peer
-    console.log("log")
-
-  },[])
-
-  useEffect(() => console.log(localConnection));
+  function handleTrackEvent(e) {
+    partnerVideo.current.srcObject = e.streams[0];
+  }
 
   return (
     <Fragment>
       <h1>Realtime communication with WebRTC</h1>
-      <video id="localVideo" autoPlay playsInline ref={localVideoRef} muted />
-      <video id="remoteVideo" autoPlay playsInline ref={remoteVideoRef}/>
-
-      <div>
-        <h2>Offer</h2>
-        <div>{!!offer && JSON.stringify(offer)}</div>
-        <h2>Answer</h2>
-        <div>{!!answer && JSON.stringify(answer)}</div>
-        <div>
-          <input type={"text"} ref={inputRef}/>
-        </div>
-        <button onClick={setLocalDescription}>Set Local</button>
-        <button onClick={setRemoteDescription}>Set Remote</button>
-        <button onClick={setOfferInput}>Set Offer</button>
-        <button onClick={setAnswerInput}>Set Answer</button>
-        <button onClick={generateOffer}>Generate Offer</button>
-      </div>
-      <div>
-        <button onClick={imOffer}>Im Offer</button>
-        <button onClick={imAnswer}>Im Answer</button>
-      </div>
+      <video id="localVideo" autoPlay playsInline ref={userVideo} muted />
+      <video id="remoteVideo" autoPlay playsInline ref={partnerVideo}/>
     </Fragment>
   )
 }
