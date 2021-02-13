@@ -16,6 +16,8 @@ export default function chat() {
   //const [localDescription, setLocalDescription] = useState();
   //const [remoteDescription, setRemoteDescription] = useState();
 
+  const constraints = {audio: true, video: true};
+
   function setLocalDescription() {
     localConnection.setLocalDescription(JSON.parse(inputRef.current.value)).then(e => console.log("Local Description setted"));
   }
@@ -42,7 +44,7 @@ export default function chat() {
     setAnswer(JSON.parse(inputRef.current.value))
   }
 
-  function imOffer() {
+  async function imOffer() {
     localConnection.onicecandidate = e =>  {
       console.log(" NEW ice candidnat!! on localconnection reprinting SDP " )
       console.log(JSON.stringify(localConnection.localDescription))
@@ -51,13 +53,26 @@ export default function chat() {
     localConnection.onconnectionstatechange = e => console.log(`OnConnectionStateChange ${JSON.stringify(e)}`);
     localConnection.onsignalingstatechange = e => console.log(`OnSignalingStateChange ${JSON.stringify(e)}`);
 
+
+
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const localVideo = localVideoRef.current;
+    localVideo.srcObject = stream;
+
+    localConnection.createOffer().then(o => localConnection.setLocalDescription(o)).then(e => console.log(JSON.stringify(localConnection.localDescription)))
+
     const sendChannel = localConnection.createDataChannel("sendChannel");
     sendChannel.onmessage =e =>  console.log("messsage received!!!"  + e.data )
-    sendChannel.onopen = e => console.log("open!!!!");
+    sendChannel.onopen = e => {
+      console.log("open!!!!");
+      stream.getTracks().forEach(track => {
+        debugger;
+        localConnection.addTrack(track, stream);
+      })
+    };
+
+    localConnection.ontrack = e => console.log('Track LOCAL ' + JSON.stringify(e));
     sendChannel.onclose = e => console.log("closed!!!!!!");
-
-
-    localConnection.createOffer().then(o => localConnection.setLocalDescription(o) )
   }
 
   async function imAnswer() {
@@ -67,12 +82,15 @@ export default function chat() {
       console.log(JSON.stringify(localConnection.localDescription) )
     }
 
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    const localVideo = localVideoRef.current;
+    localVideo.srcObject = stream;
 
     localConnection.ondatachannel= event => {
 
       const receiveChannel = event.channel;
       receiveChannel.onmessage =e =>  console.log("messsage received!!!"  + e.data )
-      receiveChannel.onopen = e => console.log("open!!!!");
+      receiveChannel.onopen = e => console.log("open!!!! " + JSON.stringify(e));
       receiveChannel.onclose =e => console.log("closed!!!!!!");
       localConnection.channel = receiveChannel;
 
@@ -83,6 +101,8 @@ export default function chat() {
 //create answer
     localConnection.createAnswer().then(a => localConnection.setLocalDescription(a)).then(a=>
       console.log(JSON.stringify(localConnection.localDescription)))
+
+    localConnection.ontrack = e => console.log('Track REMOTE ' + JSON.stringify(e));
   }
 
   function generateOffer() {
@@ -97,15 +117,13 @@ export default function chat() {
     const configuration = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
     const lc = new RTCPeerConnection();
 
-    const constraints = {audio: true, video: true};
-    const localVideo = localVideoRef.current;
+
+
     const remoteVideo = remoteVideoRef.current;
     let localStream;
 
     async function loadLocalMedia() {
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
-      localVideo.srcObject = stream;
-      localStream = stream;
+
     }
 
 
@@ -114,14 +132,7 @@ export default function chat() {
     loadLocalMedia();
 // send any ice candidates to the other peer
     console.log("log")
-    /*
-    lc.onicecandidate = e => console.log("Candidate" + JSON.stringify(e));
-    lc.oniceconnectionstatechange = e => console.log(e);
-    lc.onconnectionstatechange = e => console.log(`OnConnectionStateChange ${JSON.stringify(e)}`);
-    lc.onsignalingstatechange = e => console.log(`OnSignalingStateChange ${JSON.stringify(e)}`);
 
-
-*/
   },[])
 
   useEffect(() => console.log(localConnection));
