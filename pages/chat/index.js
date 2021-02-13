@@ -1,6 +1,8 @@
 import {Fragment, useEffect, useRef, useState} from "react";
 import io from "socket.io-client";
 
+const log = msg => console.log(msg);
+
 export default function chat() {
   const userVideo = useRef();
   const partnerVideo = useRef();
@@ -8,6 +10,7 @@ export default function chat() {
   const socketRef = useRef();
   const otherUser = useRef();
   const userStream = useRef();
+  const roomId = "test";
 
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ audio: true, video: true }).then(stream => {
@@ -15,7 +18,7 @@ export default function chat() {
       userStream.current = stream;
 
       socketRef.current = io.connect("http://localhost:8000/");
-      socketRef.current.emit("join room", "test");
+      socketRef.current.emit("join room", roomId);
 
       socketRef.current.on('other user', userID => {
         callUser(userID);
@@ -33,11 +36,11 @@ export default function chat() {
       socketRef.current.on("ice-candidate", handleNewICECandidateMsg);
     });
 
-    return () => {
-      peerRef.current.close();
-      socketRef.current.emit("close")
-    };
+    window.onbeforeunload = hangout;
 
+    return () => {
+      hangout();
+    };
   }, []);
 
   function callUser(userID) {
@@ -67,6 +70,7 @@ export default function chat() {
   }
 
   function handleNegotiationNeededEvent(userID) {
+    console.log("Negotiation");
     peerRef.current.createOffer().then(offer => {
       return peerRef.current.setLocalDescription(offer);
     }).then(() => {
@@ -122,6 +126,12 @@ export default function chat() {
 
   function handleTrackEvent(e) {
     partnerVideo.current.srcObject = e.streams[0];
+  }
+
+  function hangout() {
+    socketRef.current.emit("close", roomId);
+    peerRef.current.close();
+    socketRef.current.close();
   }
 
   return (
