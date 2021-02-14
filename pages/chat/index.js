@@ -3,7 +3,7 @@ import io from "socket.io-client";
 
 const log = msg => console.log(msg);
 
-export default function chat() {
+export default function Chat({serverURI}) {
   const userVideo = useRef();
   const partnerVideo = useRef();
   const peerRef = useRef();
@@ -17,7 +17,7 @@ export default function chat() {
       userVideo.current.srcObject = stream;
       userStream.current = stream;
 
-      socketRef.current = io.connect("http://localhost:8000/");
+      socketRef.current = io.connect(serverURI);
       socketRef.current.emit("join room", roomId);
 
       socketRef.current.on('other user', userID => {
@@ -141,4 +141,8 @@ export default function chat() {
       <video id="remoteVideo" autoPlay playsInline ref={partnerVideo}/>
     </Fragment>
   )
+}
+
+export async function getStaticProps() {
+  return { props: {serverURI: process.env.SERVER_URI} }
 }
