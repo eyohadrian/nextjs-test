@@ -1,4 +1,4 @@
-import {Fragment, useEffect, useRef, useState} from "react";
+import {Fragment, useEffect, useRef} from "react";
 import io from "socket.io-client";
 
 const log = msg => console.log(msg);
