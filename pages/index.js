@@ -18,7 +18,6 @@ export default function Home() {
         <p className={styles.description}>
           (Meanwhile, Hi Mom I ❤️ you so much!)
         </p>
-        <a href="http://d1u60c6ghftig7.cloudfront.net/?test=test">test</a>
       </main>
     </div>
   )
