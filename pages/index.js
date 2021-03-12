@@ -1,6 +1,7 @@
 import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
+
 export default function Home() {
   return (
     <div className={styles.container}>
@@ -19,7 +20,6 @@ export default function Home() {
         </p>
         <a href="http://d1u60c6ghftig7.cloudfront.net/?test=test">test</a>
       </main>
-
     </div>
   )
 }
