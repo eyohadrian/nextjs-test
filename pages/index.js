@@ -2,11 +2,11 @@ import Head from 'next/head'
 import styles from '../styles/Home.module.css'
 
 
-export default function Home() {
+export default function Home({env}) {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Hi I'm dev</title>
+        <title>Hi I'm {env}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -21,4 +21,10 @@ export default function Home() {
       </main>
     </div>
   )
+}
+
+export async function getStaticProps() {
+  return {
+    props: {env: process.env.TEST}
+  }
 }
