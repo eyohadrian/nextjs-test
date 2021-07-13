@@ -1,8 +1,8 @@
 import Head from 'next/head'
-import styles from '../styles/Home.module.css'
+import styles from '../../styles/Home.module.css'
 
 
-export default function Home({env}) {
+function Home({env}) {
   return (
     <div className={styles.container}>
       <Head>
@@ -23,8 +23,10 @@ export default function Home({env}) {
   )
 }
 
+export default Home;
+
 export async function getStaticProps() {
   return {
-    props: {env: process.env.TEST}
+    props: {env: process.env.ENV}
   }
 }
