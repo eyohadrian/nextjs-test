@@ -1,16 +1,16 @@
 import Amplify, {Auth} from "aws-amplify";
-import {awsCognitoConfig} from "./awsCognitoConfig";
 import React, {Fragment, useCallback, useEffect, useState} from "react";
 import {useRouter} from "next/router";
 import {LOGIN, ROOT} from "../misc/constants/routes";
 
-Amplify.configure(awsCognitoConfig);
 
-function RouterAuth({children}) {
+
+function RouterAuth({children, config}) {
   const router = useRouter();
   const [session, setSession] = useState();
 
   useEffect(() => {
+    Amplify.configure(config);
     Auth.currentSession().then(c => {
       console.log("Session", c);
       setSession(() => c);
@@ -52,11 +52,12 @@ function RouterAuth({children}) {
   return <Component/>
 }
 
-export default function Authentication({children, env}) {
+export default function Authentication({children, env, config}) {
+  console.log(env);
   return env === "PROD"
     ? <Fragment>{children}</Fragment>
     : (
-      <RouterAuth>
+      <RouterAuth config={config}>
         {children}
       </RouterAuth>
       )

@@ -27,6 +27,6 @@ export default Home;
 
 export async function getStaticProps() {
   return {
-    props: {env: process.env.ENV}
+    props: {env: process.env.NEXT_PUBLIC_ENV}
   }
 }
