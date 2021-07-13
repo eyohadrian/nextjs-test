@@ -1,12 +1,12 @@
 import Head from 'next/head'
-import styles from '../styles/Home.module.css'
+import styles from '../../styles/Home.module.css'
 
 
-export default function Home() {
+function Home({env}) {
   return (
     <div className={styles.container}>
       <Head>
-        <title>Create Next App</title>
+        <title>Hi I'm {env}</title>
         <link rel="icon" href="/favicon.ico" />
       </Head>
 
@@ -21,4 +21,12 @@ export default function Home() {
       </main>
     </div>
   )
+}
+
+export default Home;
+
+export async function getStaticProps() {
+  return {
+    props: {env: process.env.ENV}
+  }
 }
