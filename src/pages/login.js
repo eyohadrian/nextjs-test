@@ -1,6 +1,7 @@
 import {useEffect, useRef} from "react";
 import {Auth} from "aws-amplify";
 import {useRouter} from "next/router";
+import {ROOT} from "../misc/constants/routes";
 
 function Login ({env}) {
 
@@ -9,8 +10,8 @@ function Login ({env}) {
   const passwordRef = useRef();
 
   useEffect(() => {
-    if (env==="ENV") {
-      router.push("/");
+    if (env === "PROD") {
+      router.push(ROOT);
     }
   }, [])
 
@@ -18,17 +19,30 @@ function Login ({env}) {
     return await Auth.signIn(userRef.current.value, passwordRef.current.value);
   }
 
-  function onClick() {
+  function onClickSignIn() {
     signIn().then(() => {
-      router.push("/");
+      router.push(ROOT);
     }).catch(error => console.log(error));
+  }
+
+  async function signOut() {
+    try {
+      await Auth.signOut();
+    } catch (error) {
+      console.log('error signing out: ', error);
+    }
+  }
+
+  function onClickSignOut() {
+    signOut();
   }
 
   return (
     <div>
       <input ref={userRef}/>
       <input ref={passwordRef}/>
-      <button onClick={onClick}>Click</button>
+      <button onClick={onClickSignIn}>Click</button>
+      <button onClick={onClickSignOut}>Sign Out</button>
     </div>
   )
 }
