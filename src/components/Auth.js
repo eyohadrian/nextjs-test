@@ -3,14 +3,12 @@ import React, {Fragment, useCallback, useEffect, useState} from "react";
 import {useRouter} from "next/router";
 import {LOGIN, ROOT} from "../misc/constants/routes";
 
-
-
-function RouterAuth({children, config}) {
+function RouterAuth({children}) {
   const router = useRouter();
   const [session, setSession] = useState();
 
   useEffect(() => {
-    Amplify.configure(config);
+
     Auth.currentSession().then(c => {
       console.log("Session", c);
       setSession(() => c);
@@ -57,7 +55,7 @@ export default function Authentication({children, env, config}) {
   return env === "PROD"
     ? <Fragment>{children}</Fragment>
     : (
-      <RouterAuth config={config}>
+      <RouterAuth>
         {children}
       </RouterAuth>
       )

@@ -53,7 +53,7 @@ export async function getStaticProps() {
 
   return {
     props: {
-      env: process.env.NEXT_PUBLIC_ENV
+      env: process.env.ENV
     }
   }
 }
